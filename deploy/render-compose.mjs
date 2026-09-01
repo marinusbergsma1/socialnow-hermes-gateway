@@ -45,6 +45,9 @@ const compose = `services:
     ports:
       - "80:80"
       - "443:443"
+    dns:
+      - "1.1.1.1"
+      - "1.0.0.1"
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile

@@ -95,6 +95,7 @@ const compose = `services:
     depends_on:
       provisioner: { condition: service_healthy }
     command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "provisioner:3000"]
+    dns: ["1.1.1.1", "1.0.0.1"]
     ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     security_opt: ["no-new-privileges:true"]
