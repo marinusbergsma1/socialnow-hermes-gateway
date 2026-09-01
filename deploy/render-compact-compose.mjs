@@ -13,6 +13,7 @@ const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).jo
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
 const caddyDigest = digest("deploy/Caddyfile");
 const haproxyDigest = digest("deploy/haproxy.cfg");
+const haproxyConfig = fs.readFileSync(path.join(root, "deploy/haproxy.cfg")).toString("base64");
 
 const compose = `services:
   queue-init:
@@ -127,7 +128,7 @@ const compose = `services:
       - /bin/sh
       - -ec
       - |
-        wget -qO /tmp/haproxy.cfg ${base}/deploy/haproxy.cfg
+        printf '%s' '${haproxyConfig}' | base64 -d > /tmp/haproxy.cfg
         echo '${haproxyDigest}  /tmp/haproxy.cfg' | sha256sum -c -
         exec haproxy -W -db -f /tmp/haproxy.cfg
     extra_hosts: ["host.docker.internal:host-gateway"]
