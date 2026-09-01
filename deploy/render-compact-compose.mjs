@@ -6,18 +6,17 @@ const root = path.resolve(import.meta.dirname, "..");
 const revision = process.argv[2];
 if (!/^[a-f0-9]{40}$/.test(revision || "")) throw new Error("Geef de publieke Git-commit mee");
 
-const sources = ["server.mjs", "core.mjs", "oidc.mjs", "file-queue.mjs", "queue.mjs"];
+const sources = ["server.mjs", "core.mjs", "oidc.mjs", "file-queue.mjs", "github-app.mjs"];
 const digest = relative => crypto.createHash("sha256").update(fs.readFileSync(path.join(root, relative))).digest("hex");
 const base = `https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/${revision}`;
 const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).join("\n        ");
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
-const queueDigest = digest("deploy/queue-pusher.sh");
 
 const compose = `services:
   queue-init:
     image: alpine:3.22
     restart: "no"
-    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay"]
+    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered && chown -R 1000:1000 /queue/outbox /queue/replay /queue/delivered"]
     volumes: ["hermes_queue:/queue"]
     read_only: true
     security_opt: ["no-new-privileges:true"]
@@ -67,20 +66,25 @@ const compose = `services:
       start_period: 15s
 
   queue-pusher:
-    image: alpine/git:latest
+    image: node:22-alpine
     restart: unless-stopped
     depends_on:
       queue-init: { condition: service_completed_successfully }
-    entrypoint:
+    user: node
+    command:
       - /bin/sh
       - -ec
       - |
-        wget -qO /tmp/queue-pusher.sh ${base}/deploy/queue-pusher.sh
-        echo '${queueDigest}  /tmp/queue-pusher.sh' | sha256sum -c -
-        exec /bin/sh /tmp/queue-pusher.sh
+        mkdir -p /tmp/app
+        cd /tmp/app
+        wget -qO github-app.mjs ${base}/src/github-app.mjs
+        echo '${digest("src/github-app.mjs")}  github-app.mjs' | sha256sum -c -
+        exec node github-app.mjs
     environment:
-      QUEUE_GIT_REPOSITORY: \${QUEUE_GIT_REPOSITORY}
-      QUEUE_SSH_PRIVATE_KEY_B64: \${QUEUE_SSH_PRIVATE_KEY_B64}
+      QUEUE_GITHUB_REPOSITORY: \${QUEUE_GITHUB_REPOSITORY}
+      GITHUB_APP_ID: \${GITHUB_APP_ID}
+      GITHUB_APP_INSTALLATION_ID: \${GITHUB_APP_INSTALLATION_ID}
+      GITHUB_APP_PRIVATE_KEY_B64: \${GITHUB_APP_PRIVATE_KEY_B64}
     volumes: ["hermes_queue:/queue"]
     read_only: true
     tmpfs: ["/tmp:size=16m,noexec,nosuid"]

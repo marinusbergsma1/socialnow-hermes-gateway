@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { decodeEncryptionKey, encryptRequest, sha256, validateProvisionRequest } from "./core.mjs";
 import { FileQueue } from "./file-queue.mjs";
-import { GitQueue } from "./queue.mjs";
 import { verifyVercelOidc } from "./oidc.mjs";
 
 const VERSION = "2026.09.01-1";
@@ -21,13 +20,7 @@ if (!issuer.startsWith("https://oidc.vercel.com") || !audience.startsWith("https
 }
 
 const oidcConfig = { issuer, audience, projectId, ownerId, subject: expectedSubject };
-const queue = process.env.QUEUE_MODE === "file"
-  ? new FileQueue({ dataDir })
-  : new GitQueue({
-      dataDir,
-      repository: process.env.QUEUE_GIT_REPOSITORY,
-      privateKeyBase64: process.env.QUEUE_SSH_PRIVATE_KEY_B64,
-    });
+const queue = new FileQueue({ dataDir });
 const hits = new Map();
 
 function json(res, status, body) {

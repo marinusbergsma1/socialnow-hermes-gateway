@@ -4,12 +4,11 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const files = {
   caddyfile: "deploy/Caddyfile",
-  queue_pusher: "deploy/queue-pusher.sh",
+  github_app: "src/github-app.mjs",
   server: "src/server.mjs",
   core: "src/core.mjs",
   oidc: "src/oidc.mjs",
   file_queue: "src/file-queue.mjs",
-  git_queue: "src/queue.mjs",
 };
 
 function content(relative) {
@@ -25,7 +24,7 @@ const compose = `services:
   queue-init:
     image: alpine:3.22
     restart: "no"
-    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay"]
+    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered && chown -R 1000:1000 /queue/outbox /queue/replay /queue/delivered"]
     volumes:
       - hermes_queue:/queue
     read_only: true
@@ -89,8 +88,6 @@ const compose = `services:
         target: /app/oidc.mjs
       - source: file_queue
         target: /app/file-queue.mjs
-      - source: git_queue
-        target: /app/queue.mjs
     volumes:
       - hermes_queue:/data
     read_only: true
@@ -111,18 +108,21 @@ const compose = `services:
       start_period: 10s
 
   queue-pusher:
-    image: alpine/git:latest
+    image: node:22-alpine
     restart: unless-stopped
     depends_on:
       queue-init:
         condition: service_completed_successfully
-    entrypoint: ["/bin/sh", "/app/queue-pusher.sh"]
+    user: node
+    command: ["node", "/app/github-app.mjs"]
     environment:
-      QUEUE_GIT_REPOSITORY: \${QUEUE_GIT_REPOSITORY}
-      QUEUE_SSH_PRIVATE_KEY_B64: \${QUEUE_SSH_PRIVATE_KEY_B64}
+      QUEUE_GITHUB_REPOSITORY: \${QUEUE_GITHUB_REPOSITORY}
+      GITHUB_APP_ID: \${GITHUB_APP_ID}
+      GITHUB_APP_INSTALLATION_ID: \${GITHUB_APP_INSTALLATION_ID}
+      GITHUB_APP_PRIVATE_KEY_B64: \${GITHUB_APP_PRIVATE_KEY_B64}
     configs:
-      - source: queue_pusher
-        target: /app/queue-pusher.sh
+      - source: github_app
+        target: /app/github-app.mjs
     volumes:
       - hermes_queue:/queue
     read_only: true

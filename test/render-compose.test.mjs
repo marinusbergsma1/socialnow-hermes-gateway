@@ -9,7 +9,8 @@ test("Hostinger compose bevat drie gescheiden containers zonder geheime waarden"
   assert.match(output, /provisioner:/);
   assert.match(output, /queue-pusher:/);
   assert.match(output, /caddy:/);
-  assert.match(output, /QUEUE_SSH_PRIVATE_KEY_B64: \$\{QUEUE_SSH_PRIVATE_KEY_B64\}/);
+  assert.match(output, /GITHUB_APP_PRIVATE_KEY_B64: \$\{GITHUB_APP_PRIVATE_KEY_B64\}/);
+  assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
 });
 
@@ -19,6 +20,8 @@ test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes",
   assert.ok(Buffer.byteLength(output) <= 8192);
   assert.match(output, /sha256sum -c/);
   assert.match(output, /QUEUE_ENCRYPTION_KEY: \$\{QUEUE_ENCRYPTION_KEY\}/);
+  assert.match(output, /GITHUB_APP_INSTALLATION_ID: \$\{GITHUB_APP_INSTALLATION_ID\}/);
+  assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.match(output, /127\.0\.0\.1:39101:3000/);
   assert.match(output, /network_mode: host/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
