@@ -22,3 +22,11 @@ voordat de aanvraag in GitHub wordt gezet.
 `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_PRIVATE_KEY_B64` en
 `QUEUE_ENCRYPTION_KEY` zijn verplicht. Ze horen in de
 Hostinger Docker Manager-omgeving en nooit in Git.
+
+## VPS-netwerk
+
+Docker publiceert de provisioner uitsluitend op `127.0.0.1:39101`. De bestaande Caddy-
+service van de VPS gebruikt `deploy/Caddyfile` als hostconfiguratie en verzorgt TLS voor
+`hermes.socialnow.nl`. Start geen tweede Caddy-container: poort 80/443 wordt centraal door
+de VPS-proxy beheerd. Valideer een wijziging altijd met `caddy validate` voordat Caddy wordt
+herladen.

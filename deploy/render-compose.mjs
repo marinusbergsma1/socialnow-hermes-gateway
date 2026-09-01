@@ -3,7 +3,6 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const files = {
-  caddyfile: "deploy/Caddyfile",
   github_app: "src/github-app.mjs",
   server: "src/server.mjs",
   core: "src/core.mjs",
@@ -20,11 +19,6 @@ function block(value, spaces = 4) {
   return value.split("\n").map(line => `${prefix}${line}`).join("\n");
 }
 
-function configContent(name, relative) {
-  const value=content(relative);
-  return name === "caddyfile" ? value.replace("provisioner:3000", "127.0.0.1:39101") : value;
-}
-
 const compose = `services:
   queue-init:
     image: alpine:3.22
@@ -39,32 +33,6 @@ const compose = `services:
       - ALL
     cap_add:
       - CHOWN
-
-  caddy:
-    image: caddy:2.10-alpine
-    restart: unless-stopped
-    depends_on:
-      provisioner:
-        condition: service_healthy
-    network_mode: host
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    read_only: true
-    tmpfs:
-      - /tmp:size=4m,noexec,nosuid
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    pids_limit: 100
-    mem_limit: 256m
-    cpus: 0.50
 
   provisioner:
     image: node:22-alpine
@@ -145,12 +113,10 @@ const compose = `services:
     cpus: 0.25
 
 volumes:
-  caddy_data:
-  caddy_config:
   hermes_queue:
 
 configs:
-${Object.entries(files).map(([name, relative]) => `  ${name}:\n    content: |\n${block(configContent(name, relative), 6)}`).join("\n")}
+${Object.entries(files).map(([name, relative]) => `  ${name}:\n    content: |\n${block(content(relative), 6)}`).join("\n")}
 `;
 
 process.stdout.write(compose);

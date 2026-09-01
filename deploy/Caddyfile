@@ -4,8 +4,11 @@
 }
 
 hermes.socialnow.nl {
+  request_body {
+    max_size 64KB
+  }
   encode zstd gzip
-  reverse_proxy provisioner:3000
+  reverse_proxy 127.0.0.1:39101
   header {
     Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -13,9 +16,5 @@ hermes.socialnow.nl {
     Referrer-Policy "no-referrer"
     Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
     -Server
-  }
-  log {
-    output stdout
-    format json
   }
 }

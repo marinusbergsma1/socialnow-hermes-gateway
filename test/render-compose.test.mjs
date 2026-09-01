@@ -3,16 +3,16 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 
-test("Hostinger compose bevat gescheiden containers zonder geheime waarden", () => {
+test("Hostinger compose bevat afgeschermde services zonder tweede TLS-proxy", () => {
   const script = path.resolve(import.meta.dirname, "../deploy/render-compose.mjs");
   const output = execFileSync(process.execPath, [script], { encoding: "utf8" });
   assert.match(output, /provisioner:/);
   assert.match(output, /queue-pusher:/);
-  assert.match(output, /caddy:/);
+  assert.doesNotMatch(output, /caddy:/);
   assert.doesNotMatch(output, /edge-proxy:/);
   assert.match(output, /GITHUB_APP_PRIVATE_KEY_B64: \$\{GITHUB_APP_PRIVATE_KEY_B64\}/);
-  assert.match(output, /network_mode: host/);
-  assert.match(output, /reverse_proxy 127\.0\.0\.1:39101/);
+  assert.match(output, /127\.0\.0\.1:39101:3000/);
+  assert.doesNotMatch(output, /network_mode: host/);
   assert.doesNotMatch(output, /GODEBUG|resolv\.conf/);
   assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
@@ -27,11 +27,18 @@ test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes",
   assert.match(output, /GITHUB_APP_INSTALLATION_ID: \$\{GITHUB_APP_INSTALLATION_ID\}/);
   assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.match(output, /127\.0\.0\.1:39101:3000/);
-  assert.match(output, /network_mode: host/);
+  assert.doesNotMatch(output, /network_mode: host/);
   assert.doesNotMatch(output, /ports: \["80:80", "443:443"\]/);
-  assert.match(Buffer.from(output.match(/printf '%s' '([^']+)' \| base64 -d/)[1], "base64").toString("utf8"), /reverse_proxy 127\.0\.0\.1:39101/);
   assert.doesNotMatch(output, /GODEBUG|resolv\.conf/);
-  assert.match(output, /base64 -d > \/tmp\/Caddyfile/);
+  assert.doesNotMatch(output, /Caddyfile|caddy:/);
   assert.doesNotMatch(output, /raw\.githubusercontent\.com.*deploy\/Caddyfile/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
+});
+
+test("VPS host-Caddy routeert alleen naar de lokale Hermes-poort", () => {
+  const caddyfile = path.resolve(import.meta.dirname, "../deploy/Caddyfile");
+  const output = execFileSync("cat", [caddyfile], { encoding: "utf8" });
+  assert.match(output, /reverse_proxy 127\.0\.0\.1:39101/);
+  assert.match(output, /max_size 64KB/);
+  assert.doesNotMatch(output, /provisioner:3000/);
 });

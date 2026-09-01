@@ -11,9 +11,6 @@ const digest = relative => crypto.createHash("sha256").update(fs.readFileSync(pa
 const base = `https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/${revision}`;
 const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).join("\n        ");
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
-const caddySource = fs.readFileSync(path.join(root, "deploy/Caddyfile"), "utf8").replace("provisioner:3000", "127.0.0.1:39101");
-const caddyDigest = crypto.createHash("sha256").update(caddySource).digest("hex");
-const caddyConfig = Buffer.from(caddySource).toString("base64");
 
 const compose = `services:
   queue-init:
@@ -97,33 +94,8 @@ const compose = `services:
     mem_limit: 128m
     cpus: 0.25
 
-  caddy:
-    image: caddy:2.10-alpine
-    restart: unless-stopped
-    depends_on:
-      provisioner: { condition: service_healthy }
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        printf '%s' '${caddyConfig}' | base64 -d > /tmp/Caddyfile
-        echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
-        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
-    network_mode: host
-    volumes: ["caddy_data:/data", "caddy_config:/config"]
-    read_only: true
-    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: ["ALL"]
-    cap_add: ["NET_BIND_SERVICE"]
-    pids_limit: 100
-    mem_limit: 256m
-    cpus: 0.50
-
 volumes:
   hermes_queue:
-  caddy_data:
-  caddy_config:
 `;
 
 if (Buffer.byteLength(compose) > 8192) throw new Error(`Compact manifest te groot: ${Buffer.byteLength(compose)}`);
