@@ -13,3 +13,11 @@ test("Hostinger compose bevat drie gescheiden containers zonder geheime waarden"
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
 });
 
+test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes", () => {
+  const script = path.resolve(import.meta.dirname, "../deploy/render-compact-compose.mjs");
+  const output = execFileSync(process.execPath, [script, "a".repeat(40)], { encoding: "utf8" });
+  assert.ok(Buffer.byteLength(output) <= 8192);
+  assert.match(output, /sha256sum -c/);
+  assert.match(output, /QUEUE_ENCRYPTION_KEY: \$\{QUEUE_ENCRYPTION_KEY\}/);
+  assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
+});
