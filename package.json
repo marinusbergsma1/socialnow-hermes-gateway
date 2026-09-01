@@ -9,9 +9,5 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test \"test/**/*.test.mjs\""
-  },
-  "dependencies": {
-    "jose": "5.10.0"
   }
 }
-

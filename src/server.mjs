@@ -1,9 +1,10 @@
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import { decodeEncryptionKey, encryptRequest, sha256, validateProvisionRequest } from "./core.mjs";
+import { FileQueue } from "./file-queue.mjs";
 import { GitQueue } from "./queue.mjs";
+import { verifyVercelOidc } from "./oidc.mjs";
 
 const VERSION = "2026.09.01-1";
 const port = Math.max(1, Math.min(65535, Number(process.env.PORT || 3000)));
@@ -19,12 +20,14 @@ if (!issuer.startsWith("https://oidc.vercel.com") || !audience.startsWith("https
   throw new Error("oidc_configuration_missing");
 }
 
-const jwks = createRemoteJWKSet(new URL("/.well-known/jwks", issuer));
-const queue = new GitQueue({
-  dataDir,
-  repository: process.env.QUEUE_GIT_REPOSITORY,
-  privateKeyBase64: process.env.QUEUE_SSH_PRIVATE_KEY_B64,
-});
+const oidcConfig = { issuer, audience, projectId, ownerId, subject: expectedSubject };
+const queue = process.env.QUEUE_MODE === "file"
+  ? new FileQueue({ dataDir })
+  : new GitQueue({
+      dataDir,
+      repository: process.env.QUEUE_GIT_REPOSITORY,
+      privateKeyBase64: process.env.QUEUE_SSH_PRIVATE_KEY_B64,
+    });
 const hits = new Map();
 
 function json(res, status, body) {
@@ -60,14 +63,8 @@ async function body(req) {
 async function authenticate(req) {
   const match = String(req.headers.authorization || "").match(/^Bearer\s+([^\s]+)$/);
   if (!match) throw new Error("missing_bearer");
-  const { payload, protectedHeader } = await jwtVerify(match[1], jwks, {
-    issuer,
-    audience,
-    subject: expectedSubject,
-    algorithms: ["RS256"],
-    clockTolerance: 5,
-  });
-  if (protectedHeader.typ !== "JWT" || payload.project_id !== projectId || payload.owner_id !== ownerId || payload.environment !== "production") {
+  const payload = await verifyVercelOidc(match[1], oidcConfig);
+  if (payload.project_id !== projectId || payload.owner_id !== ownerId || payload.environment !== "production") {
     throw new Error("wrong_oidc_scope");
   }
   if (!payload.jti || typeof payload.jti !== "string") throw new Error("missing_jti");
@@ -109,7 +106,7 @@ const server = http.createServer(async (req, res) => {
       "invalid_request", "invalid_request_id", "invalid_sector", "invalid_slug",
       "missing_identity", "unknown_field",
     ]).has(code);
-    const auth = code.includes("jwt") || code.includes("oidc") || code.includes("bearer") || code.includes("jti") || error?.code === "ERR_JWT_EXPIRED" || error?.code === "EEXIST";
+    const auth = code.includes("jwt") || code.includes("oidc") || code.includes("bearer") || code.includes("jti") || error?.code === "EEXIST";
     console.error(JSON.stringify({ event: "rejected", code: auth ? "authentication_failed" : client ? code : "internal_error" }));
     json(res, auth ? 401 : client ? 400 : 503, { ok: false, error: auth ? "unauthorized" : client ? code : "temporarily_unavailable" });
   }
@@ -119,4 +116,3 @@ server.headersTimeout = 15_000;
 server.requestTimeout = 20_000;
 server.keepAliveTimeout = 5_000;
 server.listen(port, "0.0.0.0", () => console.log(JSON.stringify({ event: "started", version: VERSION, port })));
-
