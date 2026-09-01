@@ -12,6 +12,7 @@ const base = `https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes
 const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).join("\n        ");
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
 const caddyDigest = digest("deploy/Caddyfile");
+const caddyConfig = fs.readFileSync(path.join(root, "deploy/Caddyfile")).toString("base64");
 
 const compose = `services:
   queue-init:
@@ -104,12 +105,11 @@ const compose = `services:
       - /bin/sh
       - -ec
       - |
-        wget -qO /tmp/Caddyfile ${base}/deploy/Caddyfile
+        printf '%s' '${caddyConfig}' | base64 -d > /tmp/Caddyfile
         echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
         exec caddy run --config /tmp/Caddyfile --adapter caddyfile
     environment:
       GODEBUG: netdns=cgo
-    dns: ["127.0.0.11"]
     ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     read_only: true

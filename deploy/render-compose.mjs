@@ -43,8 +43,6 @@ const compose = `services:
         condition: service_healthy
     environment:
       GODEBUG: netdns=cgo
-    dns:
-      - 127.0.0.11
     ports:
       - "80:80"
       - "443:443"
