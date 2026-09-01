@@ -21,11 +21,11 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/server.mjs
-        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/core.mjs
-        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/oidc.mjs
-        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/file-queue.mjs
-        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/github-app.mjs
+        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/server.mjs
+        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/core.mjs
+        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/oidc.mjs
+        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/file-queue.mjs
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/github-app.mjs
         printf '3bcbcdbdcd0d60a6ff13670c255fd5f4ca838059309823b106c2172d7fc6a1fe  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\nae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs\n' | sha256sum -c -
         exec node server.mjs
     environment:
@@ -67,7 +67,7 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/github-app.mjs
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/src/github-app.mjs
         echo 'ae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs' | sha256sum -c -
         exec node github-app.mjs
     environment:
@@ -89,15 +89,45 @@ services:
     restart: unless-stopped
     depends_on:
       provisioner: { condition: service_healthy }
-    command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "127.0.0.1:39101"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        wget -qO /tmp/Caddyfile https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/deploy/Caddyfile
+        echo 'a3575eeeafe37d0953b19a67dfad8cc53d352b5d4faccbe99eb34858e93e6b17  /tmp/Caddyfile' | sha256sum -c -
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
     network_mode: host
     volumes: ["caddy_data:/data", "caddy_config:/config"]
+    read_only: true
+    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
     cap_add: ["NET_BIND_SERVICE"]
     pids_limit: 100
     mem_limit: 256m
     cpus: 0.50
+
+  edge-proxy:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    depends_on: [caddy]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        wget -qO /tmp/haproxy.cfg https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/438d4e460ad7afb1c1330bbb05182eea57a7fae7/deploy/haproxy.cfg
+        echo '87eaa8a4154c51438099cc57109e473b0a8afbf751a087a89becd29b82054a56  /tmp/haproxy.cfg' | sha256sum -c -
+        exec haproxy -W -db -f /tmp/haproxy.cfg
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["80:80", "443:443"]
+    read_only: true
+    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    pids_limit: 80
+    mem_limit: 96m
+    cpus: 0.25
 
 volumes:
   hermes_queue:
