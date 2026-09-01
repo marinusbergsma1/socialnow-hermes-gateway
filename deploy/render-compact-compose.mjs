@@ -108,9 +108,6 @@ const compose = `services:
         printf '%s' '${caddyConfig}' | base64 -d > /tmp/Caddyfile
         echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
         exec caddy run --config /tmp/Caddyfile --adapter caddyfile
-    environment:
-      GODEBUG: netdns=cgo
-    dns: ["153.92.2.6"]
     ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     read_only: true

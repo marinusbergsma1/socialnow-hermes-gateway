@@ -41,10 +41,6 @@ const compose = `services:
     depends_on:
       provisioner:
         condition: service_healthy
-    environment:
-      GODEBUG: netdns=cgo
-    dns:
-      - 153.92.2.6
     ports:
       - "80:80"
       - "443:443"
