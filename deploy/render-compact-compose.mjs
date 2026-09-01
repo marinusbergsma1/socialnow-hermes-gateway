@@ -12,8 +12,6 @@ const base = `https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes
 const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).join("\n        ");
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
 const caddyDigest = digest("deploy/Caddyfile");
-const haproxyDigest = digest("deploy/haproxy.cfg");
-const haproxyConfig = fs.readFileSync(path.join(root, "deploy/haproxy.cfg")).toString("base64");
 
 const compose = `services:
   queue-init:
@@ -109,7 +107,10 @@ const compose = `services:
         wget -qO /tmp/Caddyfile ${base}/deploy/Caddyfile
         echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
         exec caddy run --config /tmp/Caddyfile --adapter caddyfile
-    network_mode: host
+    environment:
+      GODEBUG: netdns=cgo
+    dns: ["127.0.0.11"]
+    ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     read_only: true
     tmpfs: ["/tmp:size=4m,noexec,nosuid"]
@@ -119,28 +120,6 @@ const compose = `services:
     pids_limit: 100
     mem_limit: 256m
     cpus: 0.50
-
-  edge-proxy:
-    image: haproxy:3.2-alpine
-    restart: unless-stopped
-    depends_on: [caddy]
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        printf '%s' '${haproxyConfig}' | base64 -d > /tmp/haproxy.cfg
-        echo '${haproxyDigest}  /tmp/haproxy.cfg' | sha256sum -c -
-        exec haproxy -W -db -f /tmp/haproxy.cfg
-    extra_hosts: ["host.docker.internal:host-gateway"]
-    ports: ["80:80", "443:443"]
-    read_only: true
-    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: ["ALL"]
-    cap_add: ["NET_BIND_SERVICE"]
-    pids_limit: 80
-    mem_limit: 96m
-    cpus: 0.25
 
 volumes:
   hermes_queue:
