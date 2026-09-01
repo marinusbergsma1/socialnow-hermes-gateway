@@ -3,49 +3,31 @@ services:
     image: alpine:3.22
     restart: "no"
     command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay && chmod 700 /queue/outbox /queue/replay"]
-    volumes:
-      - hermes_queue:/queue
+    volumes: ["hermes_queue:/queue"]
     read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-
-  caddy:
-    image: caddy:2.10-alpine
-    restart: unless-stopped
-    depends_on:
-      provisioner:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    pids_limit: 100
-    mem_limit: 256m
-    cpus: 0.50
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
 
   provisioner:
     image: node:22-alpine
     restart: unless-stopped
     depends_on:
-      queue-init:
-        condition: service_completed_successfully
+      queue-init: { condition: service_completed_successfully }
     user: node
-    command: ["node", "/app/server.mjs"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /tmp/app
+        cd /tmp/app
+        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/src/server.mjs
+        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/src/core.mjs
+        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/src/oidc.mjs
+        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/src/file-queue.mjs
+        wget -qO queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/src/queue.mjs
+        printf '0be9f2169725aeb4ef754e8cb61f0f4487099f4899a01bff7b94026ea15ba6d4  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\n2dcebd45e4a73e9ea11c0ca35dc049f90e1a0651a4a0b9fc02a352928e51479a  queue.mjs\n' | sha256sum -c -
+        exec node server.mjs
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -57,26 +39,11 @@ services:
       VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID}
       VERCEL_OWNER_ID: ${VERCEL_OWNER_ID}
       QUEUE_ENCRYPTION_KEY: ${QUEUE_ENCRYPTION_KEY}
-    configs:
-      - source: server
-        target: /app/server.mjs
-      - source: core
-        target: /app/core.mjs
-      - source: oidc
-        target: /app/oidc.mjs
-      - source: file_queue
-        target: /app/file-queue.mjs
-      - source: git_queue
-        target: /app/queue.mjs
-    volumes:
-      - hermes_queue:/data
+    volumes: ["hermes_queue:/data"]
     read_only: true
-    tmpfs:
-      - /tmp:size=32m,noexec,nosuid
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
     pids_limit: 80
     mem_limit: 192m
     cpus: 0.50
@@ -85,463 +52,48 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
   queue-pusher:
     image: alpine/git:latest
     restart: unless-stopped
     depends_on:
-      queue-init:
-        condition: service_completed_successfully
-    entrypoint: ["/bin/sh", "/app/queue-pusher.sh"]
+      queue-init: { condition: service_completed_successfully }
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        wget -qO /tmp/queue-pusher.sh https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/d032ff6b4e6ec2f3eff3f3852924f190682c58c6/deploy/queue-pusher.sh
+        echo '74be6cce1fd56bf425696166ecb5002014b8e7d8862621d5a7a96ceb75f5b760  /tmp/queue-pusher.sh' | sha256sum -c -
+        exec /bin/sh /tmp/queue-pusher.sh
     environment:
       QUEUE_GIT_REPOSITORY: ${QUEUE_GIT_REPOSITORY}
       QUEUE_SSH_PRIVATE_KEY_B64: ${QUEUE_SSH_PRIVATE_KEY_B64}
-    configs:
-      - source: queue_pusher
-        target: /app/queue-pusher.sh
-    volumes:
-      - hermes_queue:/queue
+    volumes: ["hermes_queue:/queue"]
     read_only: true
-    tmpfs:
-      - /tmp:size=16m,noexec,nosuid
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+    tmpfs: ["/tmp:size=16m,noexec,nosuid"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
     pids_limit: 80
     mem_limit: 128m
     cpus: 0.25
 
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      provisioner: { condition: service_healthy }
+    command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "provisioner:3000"]
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy_data:/data", "caddy_config:/config"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    pids_limit: 100
+    mem_limit: 256m
+    cpus: 0.50
+
 volumes:
+  hermes_queue:
   caddy_data:
   caddy_config:
-  hermes_queue:
-
-configs:
-  caddyfile:
-    content: |
-      {
-        email info@socialnow.nl
-        admin off
-      }
-      
-      hermes.socialnow.nl {
-        encode zstd gzip
-        reverse_proxy provisioner:3000
-        header {
-          Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-          X-Content-Type-Options "nosniff"
-          X-Frame-Options "DENY"
-          Referrer-Policy "no-referrer"
-          Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-          -Server
-        }
-        log {
-          output stdout
-          format json
-        }
-      }
-  queue_pusher:
-    content: |
-      #!/bin/sh
-      set -eu
-      umask 077
-      
-      ssh_dir=/tmp/ssh
-      repo_dir=/queue/repo
-      outbox=/queue/outbox
-      delivered=/queue/delivered
-      mkdir -p "$ssh_dir" "$outbox" "$delivered"
-      printf '%s' "$QUEUE_SSH_PRIVATE_KEY_B64" | base64 -d > "$ssh_dir/key"
-      chmod 600 "$ssh_dir/key"
-      printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$ssh_dir/known_hosts"
-      export GIT_SSH_COMMAND="ssh -i $ssh_dir/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$ssh_dir/known_hosts"
-      
-      if [ ! -d "$repo_dir/.git" ]; then
-        git clone --depth 1 --branch main "$QUEUE_GIT_REPOSITORY" "$repo_dir"
-      fi
-      git -C "$repo_dir" config user.name 'Hermes Provisioner'
-      git -C "$repo_dir" config user.email 'hermes-provisioner@users.noreply.github.com'
-      
-      while true; do
-        for pending in "$outbox"/*.json; do
-          [ -f "$pending" ] || continue
-          name=$(basename "$pending")
-          git -C "$repo_dir" fetch --depth 1 origin main
-          git -C "$repo_dir" reset --hard origin/main
-          if [ -f "$repo_dir/requests/$name" ]; then
-            mv "$pending" "$delivered/$name"
-            printf '{"event":"already_delivered","request":"%s"}\n' "$name"
-            continue
-          fi
-          mkdir -p "$repo_dir/requests"
-          cp "$pending" "$repo_dir/requests/$name"
-          git -C "$repo_dir" add -- "requests/$name"
-          git -C "$repo_dir" commit -m "Queue tenant ${name%.json}"
-          if git -C "$repo_dir" push origin HEAD:main; then
-            mv "$pending" "$delivered/$name"
-            printf '{"event":"delivered","request":"%s"}\n' "$name"
-          else
-            printf '{"event":"delivery_retry","request":"%s"}\n' "$name" >&2
-          fi
-        done
-        sleep 2
-      done
-  server:
-    content: |
-      import http from "node:http";
-      import fs from "node:fs/promises";
-      import path from "node:path";
-      import { decodeEncryptionKey, encryptRequest, sha256, validateProvisionRequest } from "./core.mjs";
-      import { FileQueue } from "./file-queue.mjs";
-      import { GitQueue } from "./queue.mjs";
-      import { verifyVercelOidc } from "./oidc.mjs";
-      
-      const VERSION = "2026.09.01-1";
-      const port = Math.max(1, Math.min(65535, Number(process.env.PORT || 3000)));
-      const dataDir = process.env.DATA_DIR || "/data";
-      const issuer = String(process.env.VERCEL_OIDC_ISSUER || "").replace(/\/$/, "");
-      const audience = String(process.env.VERCEL_OIDC_AUDIENCE || "");
-      const projectId = String(process.env.VERCEL_PROJECT_ID || "");
-      const ownerId = String(process.env.VERCEL_OWNER_ID || "");
-      const expectedSubject = String(process.env.VERCEL_OIDC_SUBJECT || "");
-      const encryptionKey = decodeEncryptionKey(process.env.QUEUE_ENCRYPTION_KEY);
-      
-      if (!issuer.startsWith("https://oidc.vercel.com") || !audience.startsWith("https://") || !projectId || !ownerId || !expectedSubject) {
-        throw new Error("oidc_configuration_missing");
-      }
-      
-      const oidcConfig = { issuer, audience, projectId, ownerId, subject: expectedSubject };
-      const queue = process.env.QUEUE_MODE === "file"
-        ? new FileQueue({ dataDir })
-        : new GitQueue({
-            dataDir,
-            repository: process.env.QUEUE_GIT_REPOSITORY,
-            privateKeyBase64: process.env.QUEUE_SSH_PRIVATE_KEY_B64,
-          });
-      const hits = new Map();
-      
-      function json(res, status, body) {
-        res.writeHead(status, {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
-          "Referrer-Policy": "no-referrer",
-        });
-        res.end(JSON.stringify(body));
-      }
-      
-      function limited(req) {
-        const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
-        const minute = Math.floor(Date.now() / 60_000);
-        const key = `${ip}:${minute}`;
-        const count = (hits.get(key) || 0) + 1;
-        hits.set(key, count);
-        if (hits.size > 500) for (const entry of hits.keys()) if (!entry.endsWith(`:${minute}`)) hits.delete(entry);
-        return count > 30;
-      }
-      
-      async function body(req) {
-        let raw = "";
-        for await (const chunk of req) {
-          raw += chunk;
-          if (Buffer.byteLength(raw) > 32_768) throw new Error("body_too_large");
-        }
-        return JSON.parse(raw || "{}");
-      }
-      
-      async function authenticate(req) {
-        const match = String(req.headers.authorization || "").match(/^Bearer\s+([^\s]+)$/);
-        if (!match) throw new Error("missing_bearer");
-        const payload = await verifyVercelOidc(match[1], oidcConfig);
-        if (payload.project_id !== projectId || payload.owner_id !== ownerId || payload.environment !== "production") {
-          throw new Error("wrong_oidc_scope");
-        }
-        if (!payload.jti || typeof payload.jti !== "string") throw new Error("missing_jti");
-        const replayDir = path.join(dataDir, "replay");
-        await fs.mkdir(replayDir, { recursive: true });
-        const replayFile = path.join(replayDir, `${sha256(payload.jti)}.used`);
-        await fs.writeFile(replayFile, String(payload.exp || ""), { flag: "wx", mode: 0o600 });
-        return payload;
-      }
-      
-      const server = http.createServer(async (req, res) => {
-        try {
-          if (req.method === "GET" && req.url === "/health") {
-            json(res, 200, { ok: true, service: "hermes-provisioner", version: VERSION });
-            return;
-          }
-          if (req.method !== "POST" || req.url !== "/v1/provision") {
-            json(res, 404, { ok: false });
-            return;
-          }
-          if (limited(req)) { json(res, 429, { ok: false, error: "rate_limited" }); return; }
-          if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
-            json(res, 415, { ok: false, error: "json_required" }); return;
-          }
-          await authenticate(req);
-          const request = validateProvisionRequest(await body(req), req.headers["idempotency-key"]);
-          const queued = await queue.enqueue(encryptRequest(request, encryptionKey));
-          console.log(JSON.stringify({ event: queued.existing ? "already_queued" : "queued", requestId: request.requestId, slug: request.slug }));
-          json(res, queued.existing ? 200 : 202, {
-            ok: true,
-            status: queued.existing ? "already_queued" : "queued",
-            requestId: request.requestId,
-            siteUrl: `https://${request.slug}.socialnow.nl`,
-          });
-        } catch (error) {
-          const code = String(error?.message || "error").split(":")[0];
-          const client = new Set([
-            "body_too_large", "idempotency_mismatch", "invalid_country", "invalid_email",
-            "invalid_request", "invalid_request_id", "invalid_sector", "invalid_slug",
-            "missing_identity", "unknown_field",
-          ]).has(code);
-          const auth = code.includes("jwt") || code.includes("oidc") || code.includes("bearer") || code.includes("jti") || error?.code === "EEXIST";
-          console.error(JSON.stringify({ event: "rejected", code: auth ? "authentication_failed" : client ? code : "internal_error" }));
-          json(res, auth ? 401 : client ? 400 : 503, { ok: false, error: auth ? "unauthorized" : client ? code : "temporarily_unavailable" });
-        }
-      });
-      
-      server.headersTimeout = 15_000;
-      server.requestTimeout = 20_000;
-      server.keepAliveTimeout = 5_000;
-      server.listen(port, "0.0.0.0", () => console.log(JSON.stringify({ event: "started", version: VERSION, port })));
-  core:
-    content: |
-      import crypto from "node:crypto";
-      
-      const RESERVED = new Set([
-        "api", "app", "admin", "assets", "auth", "beheer", "blog", "cdn", "demo",
-        "docs", "help", "hermes", "login", "mail", "os", "socialnow", "status",
-        "support", "vercel", "www",
-      ]);
-      
-      function clean(value, max) {
-        return String(value ?? "")
-          .replace(/[\u0000-\u001f\u007f]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, max);
-      }
-      
-      export function validateProvisionRequest(input, idempotencyKey) {
-        if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("invalid_request");
-        const allowed = new Set(["requestId", "slug", "company", "ownerEmail", "ownerName", "country", "language", "sector"]);
-        if (Object.keys(input).some(key => !allowed.has(key))) throw new Error("unknown_field");
-      
-        const requestId = clean(input.requestId, 80);
-        const slug = clean(input.slug, 40).toLowerCase();
-        const company = clean(input.company, 120);
-        const ownerEmail = clean(input.ownerEmail, 254).toLowerCase();
-        const ownerName = clean(input.ownerName, 80);
-        const country = clean(input.country, 2).toUpperCase();
-        const language = clean(input.language, 2).toLowerCase() === "en" ? "en" : "nl";
-        const sector = clean(input.sector, 60).toLowerCase() || "dienstverlening";
-      
-        if (!/^am_[a-z0-9_]{6,70}$/.test(requestId)) throw new Error("invalid_request_id");
-        if (clean(idempotencyKey, 80) !== requestId) throw new Error("idempotency_mismatch");
-        if (!/^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/.test(slug) || RESERVED.has(slug)) throw new Error("invalid_slug");
-        if (company.length < 2 || ownerName.length < 2) throw new Error("missing_identity");
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(ownerEmail)) throw new Error("invalid_email");
-        if (country && !/^[A-Z]{2}$/.test(country)) throw new Error("invalid_country");
-        if (!/^[a-z0-9-]{2,60}$/.test(sector)) throw new Error("invalid_sector");
-      
-        return { requestId, slug, company, ownerEmail, ownerName, country, language, sector };
-      }
-      
-      export function decodeEncryptionKey(value) {
-        const raw = String(value || "").trim();
-        const key = /^[a-f0-9]{64}$/i.test(raw) ? Buffer.from(raw, "hex") : Buffer.from(raw, "base64url");
-        if (key.length !== 32) throw new Error("invalid_queue_encryption_key");
-        return key;
-      }
-      
-      export function encryptRequest(request, keyValue) {
-        const key = Buffer.isBuffer(keyValue) ? keyValue : decodeEncryptionKey(keyValue);
-        const iv = crypto.randomBytes(12);
-        const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-        const plaintext = Buffer.from(JSON.stringify(request));
-        const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-        return {
-          version: 1,
-          requestId: request.requestId,
-          slug: request.slug,
-          receivedAt: new Date().toISOString(),
-          algorithm: "A256GCM",
-          iv: iv.toString("base64url"),
-          tag: cipher.getAuthTag().toString("base64url"),
-          ciphertext: ciphertext.toString("base64url"),
-        };
-      }
-      
-      export function decryptRequest(envelope, keyValue) {
-        if (envelope?.version !== 1 || envelope?.algorithm !== "A256GCM") throw new Error("invalid_envelope");
-        const key = Buffer.isBuffer(keyValue) ? keyValue : decodeEncryptionKey(keyValue);
-        const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(envelope.iv, "base64url"));
-        decipher.setAuthTag(Buffer.from(envelope.tag, "base64url"));
-        return JSON.parse(Buffer.concat([
-          decipher.update(Buffer.from(envelope.ciphertext, "base64url")),
-          decipher.final(),
-        ]).toString("utf8"));
-      }
-      
-      export function sha256(value) {
-        return crypto.createHash("sha256").update(String(value)).digest("hex");
-      }
-  oidc:
-    content: |
-      import crypto from "node:crypto";
-      
-      function decodePart(value) {
-        try { return JSON.parse(Buffer.from(value, "base64url").toString("utf8")); }
-        catch { throw new Error("invalid_jwt"); }
-      }
-      
-      let cache = { until: 0, keys: [] };
-      
-      async function remoteKeys(issuer) {
-        if (cache.until > Date.now() && cache.keys.length) return cache.keys;
-        const endpoint = new URL("/.well-known/jwks", issuer);
-        if (endpoint.protocol !== "https:" || endpoint.hostname !== "oidc.vercel.com") throw new Error("invalid_oidc_issuer");
-        const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000), cache: "no-store" });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(body.keys) || !body.keys.length) throw new Error("jwks_unavailable");
-        cache = { until: Date.now() + 10 * 60_000, keys: body.keys };
-        return cache.keys;
-      }
-      
-      export async function verifyVercelOidc(token, config, keyLoader = remoteKeys) {
-        const parts = String(token || "").split(".");
-        if (parts.length !== 3 || parts.some(part => !part)) throw new Error("invalid_jwt");
-        const header = decodePart(parts[0]);
-        const payload = decodePart(parts[1]);
-        if (header.alg !== "RS256" || header.typ !== "JWT" || typeof header.kid !== "string") throw new Error("invalid_jwt_header");
-        const keys = await keyLoader(config.issuer);
-        const jwk = keys.find(item => item?.kid === header.kid && item?.kty === "RSA" && (!item.alg || item.alg === "RS256"));
-        if (!jwk) throw new Error("unknown_jwt_key");
-        let publicKey;
-        try { publicKey = crypto.createPublicKey({ key: jwk, format: "jwk" }); }
-        catch { throw new Error("invalid_jwt_key"); }
-        const valid = crypto.verify("RSA-SHA256", Buffer.from(`${parts[0]}.${parts[1]}`), publicKey, Buffer.from(parts[2], "base64url"));
-        if (!valid) throw new Error("invalid_jwt_signature");
-      
-        const now = Math.floor(Date.now() / 1000), tolerance = 5;
-        const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-        if (payload.iss !== config.issuer || !audiences.includes(config.audience) || payload.sub !== config.subject) throw new Error("wrong_oidc_scope");
-        if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.nbf) || !Number.isFinite(payload.exp)) throw new Error("invalid_jwt_time");
-        if (payload.iat > now + tolerance || payload.nbf > now + tolerance || payload.exp <= now - tolerance) throw new Error("invalid_jwt_time");
-        // Vercel-projecttokens hebben momenteel een levensduur van twaalf uur. Een token kan
-        // desondanks maar één provisioning starten: server.mjs vereist een jti en bewaart die
-        // atomair in de replay-store. Dertien uur is alleen een strakke bovengrens op de issuer.
-        if (payload.exp - payload.iat > 13 * 60 * 60 + tolerance) throw new Error("invalid_jwt_lifetime");
-        return payload;
-      }
-  file_queue:
-    content: |
-      import fs from "node:fs/promises";
-      import path from "node:path";
-      
-      export class FileQueue {
-        constructor({ dataDir }) {
-          this.outbox = path.join(dataDir, "outbox");
-          this.lock = Promise.resolve();
-        }
-      
-        enqueue(envelope) {
-          const task = this.lock.then(() => this.#enqueue(envelope));
-          this.lock = task.catch(() => {});
-          return task;
-        }
-      
-        async #enqueue(envelope) {
-          await fs.mkdir(this.outbox, { recursive: true });
-          const target = path.join(this.outbox, `${envelope.requestId}.json`);
-          try {
-            const existing = JSON.parse(await fs.readFile(target, "utf8"));
-            if (existing.requestId === envelope.requestId && existing.slug === envelope.slug) return { existing: true };
-            throw new Error("request_conflict");
-          } catch (error) {
-            if (error.code !== "ENOENT") throw error;
-          }
-          await fs.writeFile(target, `${JSON.stringify(envelope, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-          return { existing: false };
-        }
-      }
-  git_queue:
-    content: |
-      import fs from "node:fs/promises";
-      import path from "node:path";
-      import { spawn } from "node:child_process";
-      
-      const GITHUB_HOST_KEY = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n";
-      
-      function run(command, args, options = {}) {
-        return new Promise((resolve, reject) => {
-          const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
-          let stdout = "", stderr = "";
-          child.stdout.on("data", chunk => { stdout += chunk; });
-          child.stderr.on("data", chunk => { stderr += chunk; });
-          child.on("error", reject);
-          child.on("close", code => code === 0 ? resolve(stdout.trim()) : reject(new Error(`${command}_failed_${code}:${stderr.slice(-500)}`)));
-        });
-      }
-      
-      export class GitQueue {
-        constructor({ dataDir, repository, privateKeyBase64 }) {
-          if (!/^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(repository || "")) throw new Error("invalid_queue_repository");
-          if (!privateKeyBase64) throw new Error("missing_queue_key");
-          this.root = path.join(dataDir, "queue");
-          this.sshDir = path.join(dataDir, ".ssh");
-          this.keyPath = path.join(this.sshDir, "queue_ed25519");
-          this.knownHosts = path.join(this.sshDir, "known_hosts");
-          this.repository = repository;
-          this.key = Buffer.from(privateKeyBase64, "base64").toString("utf8");
-          this.lock = Promise.resolve();
-        }
-      
-        async setup() {
-          await fs.mkdir(this.sshDir, { recursive: true, mode: 0o700 });
-          await fs.writeFile(this.keyPath, this.key, { mode: 0o600 });
-          await fs.writeFile(this.knownHosts, GITHUB_HOST_KEY, { mode: 0o600 });
-          this.gitEnv = {
-            ...process.env,
-            GIT_SSH_COMMAND: `ssh -i ${this.keyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${this.knownHosts}`,
-          };
-          try { await fs.access(path.join(this.root, ".git")); }
-          catch {
-            await fs.mkdir(path.dirname(this.root), { recursive: true });
-            await run("git", ["clone", "--depth", "1", "--branch", "main", this.repository, this.root], { env: this.gitEnv });
-          }
-          await run("git", ["config", "user.name", "Hermes Provisioner"], { cwd: this.root, env: this.gitEnv });
-          await run("git", ["config", "user.email", "hermes-provisioner@users.noreply.github.com"], { cwd: this.root, env: this.gitEnv });
-        }
-      
-        enqueue(envelope) {
-          const task = this.lock.then(() => this.#enqueue(envelope));
-          this.lock = task.catch(() => {});
-          return task;
-        }
-      
-        async #enqueue(envelope) {
-          await this.setup();
-          await run("git", ["fetch", "--depth", "1", "origin", "main"], { cwd: this.root, env: this.gitEnv });
-          await run("git", ["reset", "--hard", "origin/main"], { cwd: this.root, env: this.gitEnv });
-          const relative = `requests/${envelope.requestId}.json`;
-          const target = path.join(this.root, relative);
-          try {
-            const existing = JSON.parse(await fs.readFile(target, "utf8"));
-            if (existing.requestId === envelope.requestId && existing.slug === envelope.slug) return { existing: true };
-            throw new Error("request_conflict");
-          } catch (error) {
-            if (error.code !== "ENOENT") throw error;
-          }
-          await fs.mkdir(path.dirname(target), { recursive: true });
-          await fs.writeFile(target, `${JSON.stringify(envelope, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-          await run("git", ["add", "--", relative], { cwd: this.root, env: this.gitEnv });
-          await run("git", ["commit", "-m", `Queue tenant ${envelope.requestId}`], { cwd: this.root, env: this.gitEnv });
-          await run("git", ["push", "origin", "HEAD:main"], { cwd: this.root, env: this.gitEnv });
-          return { existing: false };
-        }
-      }
