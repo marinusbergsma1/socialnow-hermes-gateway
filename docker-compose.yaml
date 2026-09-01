@@ -21,11 +21,11 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/src/server.mjs
-        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/src/core.mjs
-        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/src/oidc.mjs
-        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/src/file-queue.mjs
-        wget -qO queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/src/queue.mjs
+        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/src/server.mjs
+        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/src/core.mjs
+        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/src/oidc.mjs
+        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/src/file-queue.mjs
+        wget -qO queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/src/queue.mjs
         printf '0be9f2169725aeb4ef754e8cb61f0f4487099f4899a01bff7b94026ea15ba6d4  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\n2dcebd45e4a73e9ea11c0ca35dc049f90e1a0651a4a0b9fc02a352928e51479a  queue.mjs\n' | sha256sum -c -
         exec node server.mjs
     environment:
@@ -63,7 +63,7 @@ services:
       - /bin/sh
       - -ec
       - |
-        wget -qO /tmp/queue-pusher.sh https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/61205fb078cd71435e2e493e9564d5067cc46f43/deploy/queue-pusher.sh
+        wget -qO /tmp/queue-pusher.sh https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/22e8faaec4e793ba4fa93c1e11956e3976d14b61/deploy/queue-pusher.sh
         echo '74be6cce1fd56bf425696166ecb5002014b8e7d8862621d5a7a96ceb75f5b760  /tmp/queue-pusher.sh' | sha256sum -c -
         exec /bin/sh /tmp/queue-pusher.sh
     environment:
@@ -84,7 +84,8 @@ services:
     depends_on:
       provisioner: { condition: service_healthy }
     command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "provisioner:3000"]
-    dns: ["1.1.1.1", "1.0.0.1"]
+    environment:
+      GODEBUG: netdns=cgo
     ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     security_opt: ["no-new-privileges:true"]
