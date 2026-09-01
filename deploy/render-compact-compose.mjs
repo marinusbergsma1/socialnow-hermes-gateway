@@ -11,6 +11,8 @@ const digest = relative => crypto.createHash("sha256").update(fs.readFileSync(pa
 const base = `https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/${revision}`;
 const downloads = sources.map(name => `wget -qO ${name} ${base}/src/${name}`).join("\n        ");
 const checks = sources.map(name => `${digest(`src/${name}`)}  ${name}`).join("\\n");
+const caddyDigest = digest("deploy/Caddyfile");
+const haproxyDigest = digest("deploy/haproxy.cfg");
 
 const compose = `services:
   queue-init:
@@ -99,15 +101,45 @@ const compose = `services:
     restart: unless-stopped
     depends_on:
       provisioner: { condition: service_healthy }
-    command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "127.0.0.1:39101"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        wget -qO /tmp/Caddyfile ${base}/deploy/Caddyfile
+        echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
     network_mode: host
     volumes: ["caddy_data:/data", "caddy_config:/config"]
+    read_only: true
+    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
     cap_add: ["NET_BIND_SERVICE"]
     pids_limit: 100
     mem_limit: 256m
     cpus: 0.50
+
+  edge-proxy:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    depends_on: [caddy]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        wget -qO /tmp/haproxy.cfg ${base}/deploy/haproxy.cfg
+        echo '${haproxyDigest}  /tmp/haproxy.cfg' | sha256sum -c -
+        exec haproxy -W -db -f /tmp/haproxy.cfg
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["80:80", "443:443"]
+    read_only: true
+    tmpfs: ["/tmp:size=4m,noexec,nosuid"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    pids_limit: 80
+    mem_limit: 96m
+    cpus: 0.25
 
 volumes:
   hermes_queue:

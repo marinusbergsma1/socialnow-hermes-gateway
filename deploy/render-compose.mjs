@@ -4,6 +4,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const files = {
   caddyfile: "deploy/Caddyfile",
+  haproxy: "deploy/haproxy.cfg",
   github_app: "src/github-app.mjs",
   server: "src/server.mjs",
   core: "src/core.mjs",
@@ -57,6 +58,33 @@ const compose = `services:
     pids_limit: 100
     mem_limit: 256m
     cpus: 0.50
+
+  edge-proxy:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    command: ["haproxy", "-W", "-db", "-f", "/etc/haproxy/haproxy.cfg"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "80:80"
+      - "443:443"
+    configs:
+      - source: haproxy
+        target: /etc/haproxy/haproxy.cfg
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    pids_limit: 80
+    mem_limit: 96m
+    cpus: 0.25
 
   provisioner:
     image: node:22-alpine

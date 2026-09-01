@@ -3,13 +3,15 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 
-test("Hostinger compose bevat drie gescheiden containers zonder geheime waarden", () => {
+test("Hostinger compose bevat gescheiden containers zonder geheime waarden", () => {
   const script = path.resolve(import.meta.dirname, "../deploy/render-compose.mjs");
   const output = execFileSync(process.execPath, [script], { encoding: "utf8" });
   assert.match(output, /provisioner:/);
   assert.match(output, /queue-pusher:/);
   assert.match(output, /caddy:/);
+  assert.match(output, /edge-proxy:/);
   assert.match(output, /GITHUB_APP_PRIVATE_KEY_B64: \$\{GITHUB_APP_PRIVATE_KEY_B64\}/);
+  assert.match(output, /http_port 8080/);
   assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
 });
@@ -24,5 +26,7 @@ test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes",
   assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.match(output, /127\.0\.0\.1:39101:3000/);
   assert.match(output, /network_mode: host/);
+  assert.match(output, /host\.docker\.internal:host-gateway/);
+  assert.match(output, /deploy\/Caddyfile/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
 });
