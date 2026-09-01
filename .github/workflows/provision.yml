@@ -1,0 +1,75 @@
+name: Provision verified onboarding
+
+on:
+  push:
+    branches: [main]
+    paths: ["requests/*.json"]
+  workflow_dispatch:
+    inputs:
+      request_file:
+        description: Encrypted request path, for an idempotent retry
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: socialnow-hermes-provisioning
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      QUEUE_ENCRYPTION_KEY: ${{ secrets.QUEUE_ENCRYPTION_KEY }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+      VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG }}
+      HERMES_CALLBACK_URL: ${{ vars.HERMES_CALLBACK_URL }}
+      HERMES_CALLBACK_SECRET: ${{ secrets.HERMES_CALLBACK_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Select encrypted request
+        id: request
+        env:
+          MANUAL_REQUEST: ${{ inputs.request_file }}
+        run: |
+          if [ -n "$MANUAL_REQUEST" ]; then file="$MANUAL_REQUEST"; else file=$(git diff-tree --no-commit-id --name-only -r HEAD -- 'requests/*.json' | head -n 1); fi
+          case "$file" in requests/am_*.json) ;; *) echo "No valid encrypted request" >&2; exit 1;; esac
+          printf 'file=%s\n' "$file" >> "$GITHUB_OUTPUT"
+      - name: Mint short-lived GitHub App token
+        id: app
+        env:
+          HERMES_GITHUB_APP_ID: ${{ secrets.HERMES_GITHUB_APP_ID }}
+          HERMES_GITHUB_APP_INSTALLATION_ID: ${{ secrets.HERMES_GITHUB_APP_INSTALLATION_ID }}
+          HERMES_GITHUB_APP_PRIVATE_KEY_B64: ${{ secrets.HERMES_GITHUB_APP_PRIVATE_KEY_B64 }}
+        run: node scripts/github-app-token.mjs
+      - uses: actions/checkout@v4
+        with:
+          repository: marinusbergsma1/socialnow-os-fabriek
+          token: ${{ steps.app.outputs.token }}
+          path: _factory
+          persist-credentials: false
+      - name: Build and test the customer OS
+        id: tenant
+        run: node scripts/provision-request.mjs prepare "${{ steps.request.outputs.file }}"
+      - name: Store generated tenant source
+        run: |
+          git config user.name "SocialNow Hermes Onboarding"
+          git config user.email "hermes-onboarding@users.noreply.github.com"
+          git add "tenants/${{ steps.tenant.outputs.slug }}"
+          git diff --cached --quiet || git commit -m "Provision tenant ${{ steps.tenant.outputs.slug }}"
+          git push origin HEAD:main
+      - name: Deploy private storage and production site
+        run: node scripts/provision-request.mjs deploy "${{ steps.request.outputs.file }}"
+      - name: Trigger the one-time owner invitation through OS-OS and Odoo
+        run: node scripts/provision-request.mjs callback "${{ steps.request.outputs.file }}"
