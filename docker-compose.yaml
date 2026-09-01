@@ -21,11 +21,11 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/server.mjs
-        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/core.mjs
-        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/oidc.mjs
-        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/file-queue.mjs
-        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/github-app.mjs
+        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/server.mjs
+        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/core.mjs
+        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/oidc.mjs
+        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/file-queue.mjs
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/github-app.mjs
         printf '3bcbcdbdcd0d60a6ff13670c255fd5f4ca838059309823b106c2172d7fc6a1fe  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\nae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs\n' | sha256sum -c -
         exec node server.mjs
     environment:
@@ -67,7 +67,7 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/df1f652e4bdf2abfd3088e218bbe9ea8bd8046b0/src/github-app.mjs
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/99404dc99ec8f22c1e95fb223c9406055c2bea89/src/github-app.mjs
         echo 'ae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs' | sha256sum -c -
         exec node github-app.mjs
     environment:
@@ -99,7 +99,7 @@ services:
     environment:
       GODEBUG: netdns=cgo
     ports: ["80:80", "443:443"]
-    volumes: ["caddy_data:/data", "caddy_config:/config"]
+    volumes: ["caddy_data:/data", "caddy_config:/config", "/run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro"]
     read_only: true
     tmpfs: ["/tmp:size=4m,noexec,nosuid"]
     security_opt: ["no-new-privileges:true"]
