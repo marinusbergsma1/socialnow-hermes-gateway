@@ -2,7 +2,7 @@ services:
   queue-init:
     image: alpine:3.22
     restart: "no"
-    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay"]
+    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered && chown -R 1000:1000 /queue/outbox /queue/replay /queue/delivered"]
     volumes: ["hermes_queue:/queue"]
     read_only: true
     security_opt: ["no-new-privileges:true"]
@@ -21,12 +21,12 @@ services:
       - |
         mkdir -p /tmp/app
         cd /tmp/app
-        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/src/server.mjs
-        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/src/core.mjs
-        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/src/oidc.mjs
-        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/src/file-queue.mjs
-        wget -qO queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/src/queue.mjs
-        printf '0be9f2169725aeb4ef754e8cb61f0f4487099f4899a01bff7b94026ea15ba6d4  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\n2dcebd45e4a73e9ea11c0ca35dc049f90e1a0651a4a0b9fc02a352928e51479a  queue.mjs\n' | sha256sum -c -
+        wget -qO server.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/server.mjs
+        wget -qO core.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/core.mjs
+        wget -qO oidc.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/oidc.mjs
+        wget -qO file-queue.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/file-queue.mjs
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/github-app.mjs
+        printf '3bcbcdbdcd0d60a6ff13670c255fd5f4ca838059309823b106c2172d7fc6a1fe  server.mjs\n220581ed0b12dd83716b861a54f73794a3519b1f8a3afa8faee1cc76c3a6a641  core.mjs\n33e785f009f60c312e19c2e441e7374a4e00171ce2f4b2003aa2643dc9e38f8f  oidc.mjs\n564a5c147f475324129f5153ba1e23a58c2a7850a5138a00e978724973e76b1a  file-queue.mjs\nae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs\n' | sha256sum -c -
         exec node server.mjs
     environment:
       NODE_ENV: production
@@ -56,20 +56,25 @@ services:
       start_period: 15s
 
   queue-pusher:
-    image: alpine/git:latest
+    image: node:22-alpine
     restart: unless-stopped
     depends_on:
       queue-init: { condition: service_completed_successfully }
-    entrypoint:
+    user: node
+    command:
       - /bin/sh
       - -ec
       - |
-        wget -qO /tmp/queue-pusher.sh https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/7e4f8d2e3cfebc562c014bd18cf6fa8ed8fa63c5/deploy/queue-pusher.sh
-        echo '74be6cce1fd56bf425696166ecb5002014b8e7d8862621d5a7a96ceb75f5b760  /tmp/queue-pusher.sh' | sha256sum -c -
-        exec /bin/sh /tmp/queue-pusher.sh
+        mkdir -p /tmp/app
+        cd /tmp/app
+        wget -qO github-app.mjs https://raw.githubusercontent.com/marinusbergsma1/socialnow-hermes-gateway/9d58bb55544048f3608d7182e4b49efaac4fb418/src/github-app.mjs
+        echo 'ae6837d152be8ecee150f677eb43b91d69eaead1030a8cc5b404573e02662ae1  github-app.mjs' | sha256sum -c -
+        exec node github-app.mjs
     environment:
-      QUEUE_GIT_REPOSITORY: ${QUEUE_GIT_REPOSITORY}
-      QUEUE_SSH_PRIVATE_KEY_B64: ${QUEUE_SSH_PRIVATE_KEY_B64}
+      QUEUE_GITHUB_REPOSITORY: ${QUEUE_GITHUB_REPOSITORY}
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID}
+      GITHUB_APP_PRIVATE_KEY_B64: ${GITHUB_APP_PRIVATE_KEY_B64}
     volumes: ["hermes_queue:/queue"]
     read_only: true
     tmpfs: ["/tmp:size=16m,noexec,nosuid"]
