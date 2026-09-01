@@ -50,6 +50,7 @@ const compose = `services:
       VERCEL_PROJECT_ID: \${VERCEL_PROJECT_ID}
       VERCEL_OWNER_ID: \${VERCEL_OWNER_ID}
       QUEUE_ENCRYPTION_KEY: \${QUEUE_ENCRYPTION_KEY}
+    ports: ["127.0.0.1:39101:3000"]
     volumes: ["hermes_queue:/data"]
     read_only: true
     tmpfs: ["/tmp:size=32m,noexec,nosuid"]
@@ -94,10 +95,8 @@ const compose = `services:
     restart: unless-stopped
     depends_on:
       provisioner: { condition: service_healthy }
-    command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "provisioner:3000"]
-    environment:
-      GODEBUG: netdns=cgo
-    ports: ["80:80", "443:443"]
+    command: ["caddy", "reverse-proxy", "--from", "hermes.socialnow.nl", "--to", "127.0.0.1:39101"]
+    network_mode: host
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]

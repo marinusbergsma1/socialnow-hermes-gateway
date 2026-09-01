@@ -42,11 +42,7 @@ const compose = `services:
     depends_on:
       provisioner:
         condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      GODEBUG: netdns=cgo
+    network_mode: host
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
@@ -82,6 +78,8 @@ const compose = `services:
       VERCEL_PROJECT_ID: \${VERCEL_PROJECT_ID}
       VERCEL_OWNER_ID: \${VERCEL_OWNER_ID}
       QUEUE_ENCRYPTION_KEY: \${QUEUE_ENCRYPTION_KEY}
+    ports:
+      - "127.0.0.1:39101:3000"
     configs:
       - source: server
         target: /app/server.mjs

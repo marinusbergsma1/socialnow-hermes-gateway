@@ -5,7 +5,7 @@
 
 hermes.socialnow.nl {
   encode zstd gzip
-  reverse_proxy provisioner:3000
+  reverse_proxy 127.0.0.1:39101
   header {
     Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -19,4 +19,3 @@ hermes.socialnow.nl {
     format json
   }
 }
-

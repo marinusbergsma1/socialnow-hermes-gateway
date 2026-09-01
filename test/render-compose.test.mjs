@@ -19,5 +19,7 @@ test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes",
   assert.ok(Buffer.byteLength(output) <= 8192);
   assert.match(output, /sha256sum -c/);
   assert.match(output, /QUEUE_ENCRYPTION_KEY: \$\{QUEUE_ENCRYPTION_KEY\}/);
+  assert.match(output, /127\.0\.0\.1:39101:3000/);
+  assert.match(output, /network_mode: host/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
 });
