@@ -43,6 +43,8 @@ const compose = `services:
         condition: service_healthy
     environment:
       GODEBUG: netdns=cgo
+    dns:
+      - 153.92.2.6
     ports:
       - "80:80"
       - "443:443"
@@ -52,7 +54,6 @@ const compose = `services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
-      - /run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro
     read_only: true
     tmpfs:
       - /tmp:size=4m,noexec,nosuid

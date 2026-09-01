@@ -110,8 +110,9 @@ const compose = `services:
         exec caddy run --config /tmp/Caddyfile --adapter caddyfile
     environment:
       GODEBUG: netdns=cgo
+    dns: ["153.92.2.6"]
     ports: ["80:80", "443:443"]
-    volumes: ["caddy_data:/data", "caddy_config:/config", "/run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro"]
+    volumes: ["caddy_data:/data", "caddy_config:/config"]
     read_only: true
     tmpfs: ["/tmp:size=4m,noexec,nosuid"]
     security_opt: ["no-new-privileges:true"]

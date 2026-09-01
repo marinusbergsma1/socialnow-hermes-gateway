@@ -12,7 +12,7 @@ test("Hostinger compose bevat gescheiden containers zonder geheime waarden", () 
   assert.doesNotMatch(output, /edge-proxy:/);
   assert.match(output, /GITHUB_APP_PRIVATE_KEY_B64: \$\{GITHUB_APP_PRIVATE_KEY_B64\}/);
   assert.match(output, /GODEBUG: netdns=cgo/);
-  assert.match(output, /\/run\/systemd\/resolve\/resolv\.conf:\/etc\/resolv\.conf:ro/);
+  assert.match(output, /153\.92\.2\.6/);
   assert.match(output, /reverse_proxy provisioner:3000/);
   assert.doesNotMatch(output, /QUEUE_SSH_PRIVATE_KEY_B64/);
   assert.doesNotMatch(output, /BEGIN OPENSSH PRIVATE KEY/);
@@ -29,7 +29,7 @@ test("compact Hostinger-manifest blijft onder de API-limiet en pint bronhashes",
   assert.match(output, /127\.0\.0\.1:39101:3000/);
   assert.doesNotMatch(output, /network_mode: host/);
   assert.match(output, /GODEBUG: netdns=cgo/);
-  assert.match(output, /\/run\/systemd\/resolve\/resolv\.conf:\/etc\/resolv\.conf:ro/);
+  assert.match(output, /dns: \["153\.92\.2\.6"\]/);
   assert.match(output, /ports: \["80:80", "443:443"\]/);
   assert.match(output, /base64 -d > \/tmp\/Caddyfile/);
   assert.doesNotMatch(output, /raw\.githubusercontent\.com.*deploy\/Caddyfile/);
