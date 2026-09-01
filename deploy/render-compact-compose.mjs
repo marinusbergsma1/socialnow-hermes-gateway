@@ -111,7 +111,7 @@ const compose = `services:
     environment:
       GODEBUG: netdns=cgo
     ports: ["80:80", "443:443"]
-    volumes: ["caddy_data:/data", "caddy_config:/config"]
+    volumes: ["caddy_data:/data", "caddy_config:/config", "/run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro"]
     read_only: true
     tmpfs: ["/tmp:size=4m,noexec,nosuid"]
     security_opt: ["no-new-privileges:true"]

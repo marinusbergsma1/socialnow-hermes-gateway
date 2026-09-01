@@ -52,6 +52,7 @@ const compose = `services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      - /run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro
     read_only: true
     tmpfs:
       - /tmp:size=4m,noexec,nosuid
