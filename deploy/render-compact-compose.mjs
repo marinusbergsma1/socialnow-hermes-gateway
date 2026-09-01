@@ -25,6 +25,20 @@ const compose = `services:
     cap_drop: ["ALL"]
     cap_add: ["CHOWN"]
 
+  dns-proxy:
+    image: adguard/dnsproxy:v0.84.1
+    restart: unless-stopped
+    command: ["-l", "0.0.0.0", "-p", "53", "-u", "https://1.1.1.1/dns-query", "-u", "https://1.0.0.1/dns-query", "--cache", "--ratelimit", "200", "--refuse-any"]
+    networks:
+      default: { ipv4_address: 172.30.77.53 }
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    pids_limit: 60
+    mem_limit: 64m
+    cpus: 0.15
+
   provisioner:
     image: node:22-alpine
     restart: unless-stopped
@@ -101,6 +115,7 @@ const compose = `services:
     restart: unless-stopped
     depends_on:
       provisioner: { condition: service_healthy }
+      dns-proxy: { condition: service_started }
     command:
       - /bin/sh
       - -ec
@@ -108,6 +123,7 @@ const compose = `services:
         printf '%s' '${caddyConfig}' | base64 -d > /tmp/Caddyfile
         echo '${caddyDigest}  /tmp/Caddyfile' | sha256sum -c -
         exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    dns: ["172.30.77.53"]
     ports: ["80:80", "443:443"]
     volumes: ["caddy_data:/data", "caddy_config:/config"]
     read_only: true
@@ -123,6 +139,11 @@ volumes:
   hermes_queue:
   caddy_data:
   caddy_config:
+
+networks:
+  default:
+    ipam:
+      config: [{ subnet: 172.30.77.0/24 }]
 `;
 
 if (Buffer.byteLength(compose) > 8192) throw new Error(`Compact manifest te groot: ${Buffer.byteLength(compose)}`);
