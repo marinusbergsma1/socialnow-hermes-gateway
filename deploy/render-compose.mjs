@@ -25,7 +25,7 @@ const compose = `services:
   queue-init:
     image: alpine:3.22
     restart: "no"
-    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay && chmod 700 /queue/outbox /queue/replay"]
+    command: ["/bin/sh", "-c", "mkdir -p /queue/outbox /queue/replay /queue/delivered /queue/repo && chown -R 1000:1000 /queue/outbox /queue/replay"]
     volumes:
       - hermes_queue:/queue
     read_only: true
