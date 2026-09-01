@@ -45,9 +45,8 @@ const compose = `services:
     ports:
       - "80:80"
       - "443:443"
-    dns:
-      - "1.1.1.1"
-      - "1.0.0.1"
+    environment:
+      GODEBUG: netdns=cgo
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
